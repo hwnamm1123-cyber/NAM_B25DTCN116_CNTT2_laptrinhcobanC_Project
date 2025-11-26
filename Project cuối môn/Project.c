@@ -34,6 +34,7 @@ typedef struct {
     int seatNumber; //Số ghế đã đặt
     double price; //Giá vé 
     int paymentStatus; //Trạng thái thanh toán (0: Chưa thanh toán || 1: Đã thanh toán)
+    int status;
     char date[20]; //Ngày giờ đặt vé
 } Ticket;
 
@@ -53,6 +54,8 @@ void book_ticket(Trip trip_list[], int num_trips, Ticket ticket_list[], int *num
 void check_ticket (Trip trip_list[], int num_trips, Ticket ticket_list[], int num_tickets);
 
 void list_trips(Trip trip_list[], int num_trips);
+
+void pay_ticket(Ticket ticket_list[], int num_tickets);
 
 
 int main(){
@@ -92,6 +95,9 @@ int main(){
                 break;
             case 5:
                 list_trips(trip_list, num_trips);
+                break;
+            case 6:
+                pay_ticket(ticket_list, num_tickets);
                 break;
             default:
                 break;
@@ -138,6 +144,7 @@ void printMenu(){
     printf ("|%-60s|\n", "6. Thanh toan ve");
     printf ("|%-60s|\n", "7. Quan ly trang thai ve");
     printf ("|%-60s|\n", "8. Bao cao thong ke & doanh thu");
+    printf ("|%-60s|\n", "9. Thoat chuong trinh");
     printf ("+------------------------------------------------------------+\n");
 }
 
@@ -368,10 +375,11 @@ void book_ticket(Trip trip_list[], int num_trips, Ticket ticket_list[], int *num
     clear_input();
 
     //Hoan tat va gan lai cac gia tri da nhap vao
-    sprintf (ticket_book.tiketId, "TICKET %4d", *num_tickets + 1);
+    sprintf (ticket_book.tiketId, "TICKET %d", *num_tickets + 1);
     strcpy (ticket_book.tripId, book_ticket_id);
 
     ticket_book.paymentStatus = 0; //Thanh toan o case 6
+    ticket_book.status = 0; // phuc vu trang thai o case 7
 
     // Tu dong sinh ngay dat ve (lay thoi gian hien tai)
     time_t now = time(NULL);
@@ -439,6 +447,7 @@ void check_ticket (Trip trip_list[], int num_trips, Ticket ticket_list[], int nu
     printf (" So ghe da dat: %d\n", ticket->seatNumber);
     printf (" Gia ve: %lf VND\n", ticket->price);
     printf (" Trang thai thanh toan: %s\n", (ticket->paymentStatus == 1 ? "DA THANH TOAN" : "CHUA THANH TOAN"));
+    printf (" Tinh trang ve: %s\n", ticket->status);
     printf ("      ----------\n");
 }
 
@@ -448,7 +457,7 @@ void list_trips(Trip trip_list[], int num_trips){
         printf ("[Thong bao] khong co chuyen xe nao de hien thi.\n");
         return;
     }
-    int page_size = 0;
+    int page_size = 10; //Neu khong nhap mac dinh la 10
     int page_number = 1;
     int input_buf;
 
@@ -564,10 +573,80 @@ void pay_ticket(Ticket ticket_list[], int num_tickets){
         printf ("[Loi] Ve %s da duoc thanh toan.\n", id_pay);
         return;
     }
-    ticket->paymentStatus = 1;
+    ticket->paymentStatus = 1; //Dat bang 1 de phuc vu cho case 7 (Danh dau da dat)
 
     printf ("[Thanh cong] Da thanh toan thanh cong ve %s.\n", id_pay);
     printf ("[Trang thai] DA THANH TOAN !!!\n");
+}
+
+//7. Khoa huy ve
+void look_cancel_ticket(Trip trip_list[], int num_trips, Ticket ticket_list[], int num_tickets){
+    int choice;
+    char id_check[20];
+
+    if (num_tickets == 0){
+        printf ("[Thong bao] Danh sach ve trong. Khong the thuc hien thao tac !!!\n");
+        return;
+    }
+
+    printf ("\n----KHOA / HUY VE XE----\n");
+    printf ("Nhap vao Ma ve can thao tac: ");
+    input(id_check, 20);
+
+    int index_check = check_ID_ticket(ticket_list, num_tickets, id_check);
+    if (index_check == -1){
+        printf ("[Loi] Khong tim thay Ma ID: %s. Vui long nhap lai !!!\n");
+        return;
+    }
+
+    Ticket *ticket = &ticket_list[index_check];
+    if(ticket->status != 0){
+        printf ("[Loi] Ve %s da bi vo hieu hoa. Khong the thao tac tiep !!!\n", id_check);
+        return;
+    }
+    int trip_index = check_ID (trip_list, num_trips, ticket->tripId);
+    
+    do{
+        do{
+            printf ("Moi ban nhap vao hanh dong (1 - Khoa ve || 2 - Huy ve || 0 - Thoat)");
+            if (scanf("%d", &choice) != 1 || choice < 0 || choice > 2){
+                printf ("[Loi] Vui long nhap vao 0 - 1 - 2 !!!\n");;
+                clear_input();
+                continue;
+            }
+            clear_input();
+            break;
+        } while (1);
+
+        switch(choice){
+            case 1:
+                ticket->status = 1;
+                printf ("[Thong bao] Da khoa ve %s thanh cong !!!\n", id_check);
+                break;
+            case 2:
+                if(ticket->paymentStatus == 1){
+                    printf ("[Loi] Khong the huy ve %s vi da thanh toan !!!\n", id_check);
+                    return;
+                }
+                //Huy ve
+                if (trip_index != -1){
+                    //xoa ve va giai phong ve
+                    Trip *trip = &trip_list[trip_index];
+                    if (trip->bookedSeats > 0){
+                        trip->bookedSeats--;
+                        printf ("[Thong bao] Da giam so ghe da dat cua chuyen xe %s. Con lai: %d\n", trip->tripID, trip->totalSeats);
+                    }
+                }
+                ticket->status = 2;
+                printf ("[Thanh cong] Huy ve %s thanh cong.\n", id_check);
+                break;
+            case 0:
+                printf ("[Thong bao] Thoat chuc nang !!!\n");
+                return;
+            default:
+                break;
+        }
+    } while (1);
 }
 
 //Hàm để in ra danh sách các chuyến xe 
